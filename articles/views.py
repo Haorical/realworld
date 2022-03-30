@@ -1,9 +1,33 @@
 from flask import request, jsonify, Blueprint
-from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from flask_jwt_extended import jwt_required, get_jwt_identity
 from .models import Article, Comment, Tag
+from users.models import Author, Follow
 from database import db
+from exc import InvalidUsage
 
 blueprint = Blueprint('article', __name__)
+
+
+def gen_article(a=None, b=None, c=None, d=None, e=None, f=None, g=None, h=False, i=0, j=None, k=None, l=None, m=False):
+    return {
+        "article": {
+            "slug": a,
+            "title": b,
+            "description": c,
+            "body": d,
+            "tagList": e,
+            "createdAt": f,
+            "updatedAt": g,
+            "favorited": h,
+            "favoritesCount": i,
+            "author": {
+                "username": j,
+                "bio": k,
+                "image": l,
+                "following": m
+            }
+        }
+    }
 
 
 @blueprint.route('/api/articles', methods=['GET'])
@@ -27,12 +51,22 @@ def feed_article():
 
 @blueprint.route('/api/articles/<slug>', methods=['GET'])
 def get_article(slug):  # 获取文章
-    return 'one article'
+    try:
+        article = Article.query.filter_by(slug=slug).first()
+        # article = Article()
+        author = Author.query.filter_by(id=article.authorid).first()
+        # author = Author()
+        tmp_favor = False
+        return jsonify(gen_article(a=article.slug, b=article.title, c=article.description, d=article.body, e=article.tags,
+                                   f=article.createdAt, g=article.updatedAt, h=tmp_favor, i=article.favoritesCount,
+                                   j=author.username, k=author.bio, l=author.image))
+    except:
+        raise InvalidUsage.article_not_found()
 
 
 @blueprint.route('/api/articles/<slug>', methods=['PUT', 'DELETE'])  # 更新文章
 @jwt_required()
-def update_article():
+def update_article(slug):
     if request.method == 'PUT':
         """{
             "article": {
@@ -44,7 +78,12 @@ def update_article():
         data = request.get_json()
         return 'update article'
     elif request.method == 'DELETE':
-        return 'delete article'
+        try:
+            article = Article.query.filter_by(slug=slug).first()
+            db.session.delete(article)
+            db.session.commit()
+        except:
+            raise InvalidUsage.article_not_found()
 
 
 @blueprint.route('/api/articles', methods=['POST'])
@@ -62,41 +101,57 @@ def creat_article():  # 创建文章
     return 'article'
 
 
+def gen_comments(a=None, b=None, c=None, d=None, e=None, f=None, g=None, h=False):
+    return {
+        "comment": {
+            "id": a,
+            "createdAt": b,
+            "updatedAt": c,
+            "body": d,
+            "author": {
+                "username": e,
+                "bio": f,
+                "image": g,
+                "following": h
+            }
+        }
+    }
+
+
 # 添加、获取 评论
 @blueprint.route('/api/articles/<slug>/comments', methods=['POST', 'GET'])
 @jwt_required()
 def op_comments(slug):
-    if request.method == 'POST':
-        data = request.get_json()
-        """{
-            "comment": {
-                "body": "His name was my name too."
-            }
-        }"""
-        return 'add comments'
+    if request.method == 'POST':  # 添加评论
+        data = request.get_json()['comment']['body']
+        user_email = get_jwt_identity()
+        current_user = Author.query.filter_by(email=user_email).first()
+        article = Article.query.filter_by(slug=slug).first()
+        cmt = Comment(body=data, authorid=current_user.id, articleid=article.id)
+        db.session.add(cmt)
+        db.session.commit()
+        return jsonify(gen_comments(a=cmt.id, b=cmt.createdAt, c=cmt.updatedAt, d=cmt.body, e=current_user.username,
+                                    f=current_user.bio, g=current_user.image))
     elif request.method == 'GET':  # 获取评论
-        """{
-            "comments": [{
-                "id": 1,
-                "createdAt": "2016-02-18T03:22:56.637Z",
-                "updatedAt": "2016-02-18T03:22:56.637Z",
-                "body": "It takes a Jacobian",
-                "author": {
-                    "username": "jake",
-                    "bio": "I work at statefarm",
-                    "image": "https://i.stack.imgur.com/xHWG8.jpg",
-                    "following": false
-                }
-            }]
-        }"""
-        return 'comments'
+        user_email = get_jwt_identity()
+        current_user = Author.query.filter_by(email=user_email).first()
+        comments = Comment.query.filter_by(slug=slug).all()
+        tcm = []
+        for cmt in comments:
+            author = Author.query.filter_by(id=cmt.authorid).first()
+            is_follow = Follow.query.filter_by(id1=current_user.id, id2=author.id).first().following
+            tcm.append(gen_comments(a=cmt.id, b=cmt.createdAt, c=cmt.updatedAt, d=cmt.body, e=author.username,
+                                    f=author.bio, g=author.image, h=is_follow))
+        return jsonify(comments=tcm)
 
 
 # 删除评论
 @blueprint.route('/api/articles/<slug>/comments/<cid>', methods=['DELETE'])
 @jwt_required()
 def delete_comments(slug, cid):
-    return 'delete comments'
+    cm = Comment.query.filter_by(id=cid)
+    db.session.delete(cm)
+    db.session.commit()
 
 
 # （不）喜欢文章

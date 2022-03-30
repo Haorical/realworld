@@ -32,7 +32,8 @@ def create_app(config_object=Config):
 
 def register_extensions(app):
     db.init_app(app)
-    # db.create_all()
+    # with app.app_context():
+    #     db.create_all()
     JWTManager().init_app(app)
     Migrate().init_app(app, db)
 
@@ -381,7 +382,9 @@ def register_errorhandlers(app):
 #         ]
 #     }"""
 #     return 'tags'
-
+app = create_app()
+with app.app_context():
+    # db.drop_all()
+    db.create_all()
 if __name__ == '__main__':
-    app = create_app()
     app.run()

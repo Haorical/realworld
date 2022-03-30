@@ -39,8 +39,10 @@ def login():
     user = Author.query.filter_by(email=email).first()
     if user is not None and user.check_password(password):
         user.token = create_access_token(identity=email)
-    return jsonify(
-        gen_user(username=user.username, email=user.email, bio=user.bio, image=user.image, token=user.token))
+        return jsonify(
+            gen_user(username=user.username, email=user.email, bio=user.bio, image=user.image, token=user.token))
+    else:
+        raise InvalidUsage.user_not_found()
 
 
 @blueprint.route('/api/users', methods=['POST'])  # 注册
@@ -117,8 +119,8 @@ def get_profile(username):  # 获取用户信息
     current_user = Author.query.filter_by(email=current_user_email).first()
     user = Author.query.filter_by(username=username).first()
     if not user:
-        return 'no user'
-    following = Follow.query.filer_by(id1=current_user.id, id2=user.id).first()
+        raise InvalidUsage.user_not_found()
+    following = Follow.query.filter_by(id1=current_user.id, id2=user.id).first()
     return jsonify(gen_profile(username=user.username, bio=user.bio, image=user.image, following=following.following))
 
 
@@ -128,17 +130,26 @@ def follow(username):
     if request.method == 'POST':  # 关注用户
         current_user_email = get_jwt_identity()
         current_user = Author.query.filter_by(email=current_user_email).first()
+        print(current_user.id)
         user = Author.query.filter_by(username=username).first()
-        following = Follow.query.filer_by(id1=current_user.id, id2=user.id).first()
-        following.following = True
+        if not user:
+            raise InvalidUsage.user_not_found()
+        try:
+            f = Follow.query.filter_by(id1=current_user.id, id2=user.id).first()
+            f.following = True
+        except:
+            f = Follow(id1=current_user.id, id2=user.id, following=True)
+            db.session.add(f)
         db.session.commit()
         return jsonify(
-            gen_profile(username=user.username, bio=user.bio, image=user.image, following=following.following))
+            gen_profile(username=user.username, bio=user.bio, image=user.image, following=f.following))
     elif request.method == 'DELETE':  # 取消关注
         current_user_email = get_jwt_identity()
         current_user = Author.query.filter_by(email=current_user_email).first()
         user = Author.query.filter_by(username=username).first()
-        following = Follow.query.filer_by(id1=current_user.id, id2=user.id).first()
+        if not user:
+            raise InvalidUsage.user_not_found()
+        following = Follow.query.filter_by(id1=current_user.id, id2=user.id).first()
         following.following = False
         db.session.commit()
         return jsonify(
