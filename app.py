@@ -23,6 +23,8 @@ def create_app(config_object=Config):
     app.config.from_object(config_object)
     register_extensions(app)
     register_blueprints(app)
+    # db.drop_all()
+    # db.creat_all()
     # register_errorhandlers(app)
     # register_shellcontext(app)
     # register_commands(app)
@@ -31,11 +33,14 @@ def create_app(config_object=Config):
 
 def register_extensions(app):
     db.init_app(app)
+    db.drop_all()
+    db.create_all()
     JWTManager().init_app(app)
 
 
 def register_blueprints(app):
     app.register_blueprint(users.views.blueprint)
+    # app.register_blueprint(profiles.views.blueprint)
     # app.register_blueprint(articles.views.blueprint)
 
 
@@ -61,15 +66,15 @@ def register_blueprints(app):
 #     }
 
 
-def gen_profile(username=None, bio=None, image=None, following=False):
-    return {
-        "profile": {
-            "username": username,
-            "bio": bio,
-            "image": image,
-            "following": following
-        }
-    }
+# def gen_profile(username=None, bio=None, image=None, following=False):
+#     return {
+#         "profile": {
+#             "username": username,
+#             "bio": bio,
+#             "image": image,
+#             "following": following
+#         }
+#     }
 
 
 # class Author(db.Model):
@@ -133,11 +138,11 @@ class Tag(db.Model):
     article_id = db.Column(db.Integer, db.ForeignKey('articles.id'))  # 外键
 
 
-class Follow(db.Model):
-    __tablename__ = 'follows'
-    id1 = db.Column(db.Integer, primary_key=True)
-    id2 = db.Column(db.Integer, primary_key=True)
-    following = db.Column(db.Boolean, default=False)
+# class Follow(db.Model):
+#     __tablename__ = 'follows'
+#     id1 = db.Column(db.Integer, primary_key=True)
+#     id2 = db.Column(db.Integer, primary_key=True)
+#     following = db.Column(db.Boolean, default=False)
 
 
 # @app.route('/api/users/login', methods=['POST'])  # 认证

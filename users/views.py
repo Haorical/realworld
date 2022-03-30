@@ -1,18 +1,11 @@
-from datetime import datetime
-from hmac import compare_digest
-from flask_bcrypt import Bcrypt
-from flask import Flask, request, jsonify, Blueprint
-from flask_sqlalchemy import SQLAlchemy
-from flask_jwt_extended import create_access_token, current_user, jwt_required, JWTManager, get_jwt_identity
-from .models import Author
+from flask import request, jsonify, Blueprint
+from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
+from .models import Author, Follow
 from database import db
-from flask_migrate import Migrate
-from sqlalchemy.exc import IntegrityError
-import pymysql
-
-pymysql.install_as_MySQLdb()
 
 blueprint = Blueprint('user', __name__)
+
+db.create_all()
 
 
 def gen_user(username=None, email=None, bio=None, image=None, token=None):
@@ -23,6 +16,17 @@ def gen_user(username=None, email=None, bio=None, image=None, token=None):
             "bio": bio,
             "image": image,
             "token": token
+        }
+    }
+
+
+def gen_profile(username=None, bio=None, image=None, following=False):
+    return {
+        "profile": {
+            "username": username,
+            "bio": bio,
+            "image": image,
+            "following": following
         }
     }
 
@@ -101,3 +105,32 @@ def update_user():
     db.session.commit()
     return jsonify(
         gen_user(username=user.username, email=user.email, bio=user.bio, image=user.image, token=user.token))
+
+
+@blueprint.route('/api/profiles/<username>', methods=['GET'])
+@jwt_required()
+def get_profile(username):  # 获取用户信息
+    current_user_email = get_jwt_identity()
+    current_user = Author.query.filter_by(email=current_user_email).first()
+    user = Author.query.filter_by(username=username).first()
+    if not user:
+        return 'no user'
+    following = Follow.query.filer_by(id1=current_user.id, id2=user.id).first()
+    return jsonify(gen_profile(username=user.username, bio=user.bio, image=user.image, following=following.following))
+
+
+@blueprint.route('/api/profiles/<username>/follow', methods=['POST', 'DELETE'])
+@jwt_required()
+def follow(username):
+    """{
+      "profile": {
+        "username": "jake",
+        "bio": "I work at statefarm",
+        "image": "https://api.realworld.io/images/smiley-cyrus.jpg",
+        "following": false
+      }
+    }"""
+    if request.method == 'POST':  # 关注用户
+        return 'follow'
+    elif request.method == 'DELETE':  # 取消关注
+        return 'unfollow'
