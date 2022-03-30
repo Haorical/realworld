@@ -53,9 +53,7 @@ def feed_article():
 def get_article(slug):  # 获取文章
     try:
         article = Article.query.filter_by(slug=slug).first()
-        # article = Article()
         author = Author.query.filter_by(id=article.authorid).first()
-        # author = Author()
         tmp_favor = False
         return jsonify(gen_article(a=article.slug, b=article.title, c=article.description, d=article.body, e=article.tags,
                                    f=article.createdAt, g=article.updatedAt, h=tmp_favor, i=article.favoritesCount,
@@ -68,16 +66,23 @@ def get_article(slug):  # 获取文章
 @jwt_required()
 def update_article(slug):
     if request.method == 'PUT':
-        """{
-            "article": {
-                "title": "Did you train your dragon?"
-            }
-            title description body
-            slug 自动会更新
-        }"""
-        data = request.get_json()
-        return 'update article'
-    elif request.method == 'DELETE':
+        article = Article.query.filter_by(slug=slug).first()
+        data = request.get_json()['article']
+        if 'title' in data:
+            article.title = data['title']
+            article.slug = data['title']
+        if 'description' in data:
+            article.description = data['description']
+        if 'body' in data:
+            article.body = data['body']
+        db.session.commit()
+        author = Author.query.filter_by(id=article.authorid).first()
+        tmp_favor = False
+        return jsonify(
+            gen_article(a=article.slug, b=article.title, c=article.description, d=article.body, e=article.tags,
+                        f=article.createdAt, g=article.updatedAt, h=tmp_favor, i=article.favoritesCount,
+                        j=author.username, k=author.bio, l=author.image))
+    elif request.method == 'DELETE':  # 删除文章
         try:
             article = Article.query.filter_by(slug=slug).first()
             db.session.delete(article)
@@ -97,7 +102,8 @@ def creat_article():  # 创建文章
             "tagList": ["reactjs", "angularjs", "dragons"]  可选参数
         }
     }"""
-    data = request.get_json()
+    data = request.get_json()['article']
+    article = Article(slug=data['title'],)
     return 'article'
 
 
