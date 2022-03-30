@@ -5,8 +5,6 @@ from database import db
 
 blueprint = Blueprint('user', __name__)
 
-db.create_all()
-
 
 def gen_user(username=None, email=None, bio=None, image=None, token=None):
     return {
@@ -122,15 +120,21 @@ def get_profile(username):  # 获取用户信息
 @blueprint.route('/api/profiles/<username>/follow', methods=['POST', 'DELETE'])
 @jwt_required()
 def follow(username):
-    """{
-      "profile": {
-        "username": "jake",
-        "bio": "I work at statefarm",
-        "image": "https://api.realworld.io/images/smiley-cyrus.jpg",
-        "following": false
-      }
-    }"""
     if request.method == 'POST':  # 关注用户
-        return 'follow'
+        current_user_email = get_jwt_identity()
+        current_user = Author.query.filter_by(email=current_user_email).first()
+        user = Author.query.filter_by(username=username).first()
+        following = Follow.query.filer_by(id1=current_user.id, id2=user.id).first()
+        following.following = True
+        db.session.commit()
+        return jsonify(
+            gen_profile(username=user.username, bio=user.bio, image=user.image, following=following.following))
     elif request.method == 'DELETE':  # 取消关注
-        return 'unfollow'
+        current_user_email = get_jwt_identity()
+        current_user = Author.query.filter_by(email=current_user_email).first()
+        user = Author.query.filter_by(username=username).first()
+        following = Follow.query.filer_by(id1=current_user.id, id2=user.id).first()
+        following.following = False
+        db.session.commit()
+        return jsonify(
+            gen_profile(username=user.username, bio=user.bio, image=user.image, following=following.following))

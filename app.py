@@ -14,6 +14,7 @@ import users, articles
 
 pymysql.install_as_MySQLdb()
 
+
 # app = Flask(__name__)
 
 
@@ -33,9 +34,10 @@ def create_app(config_object=Config):
 
 def register_extensions(app):
     db.init_app(app)
-    db.drop_all()
-    db.create_all()
+    # db.drop_all()
+    # db.create_all()
     JWTManager().init_app(app)
+    Migrate().init_app(app, db)
 
 
 def register_blueprints(app):
@@ -107,35 +109,35 @@ def register_blueprints(app):
 #     #         setattr(self, attr, value)
 
 
-class Article(db.Model):
-    __tablename__ = 'articles'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    slug = db.Column(db.String(128))
-    title = db.Column(db.String(128))
-    description = db.Column(db.String(128))
-    body = db.Column(db.String(512))
-    createdAt = db.Column(db.DateTime, default=datetime.now)
-    updatedAt = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
-    favorited = db.Column(db.Boolean)
-    favoritesCount = db.Column(db.Integer)
-    authorid = db.Column(db.Integer)
-    tags = db.relationship('Tag')
-
-
-class Comment(db.Model):
-    __tablename__ = 'comments'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    createdAt = db.Column(db.DateTime, default=datetime.now)
-    updatedAt = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
-    body = db.Column(db.String(512))
-    authorid = db.Column(db.Integer)
-
-
-class Tag(db.Model):
-    __tablename__ = 'tags'
-    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    tag_name = db.Column(db.String(16))
-    article_id = db.Column(db.Integer, db.ForeignKey('articles.id'))  # 外键
+# class Article(db.Model):
+#     __tablename__ = 'articles'
+#     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+#     slug = db.Column(db.String(128))
+#     title = db.Column(db.String(128))
+#     description = db.Column(db.String(128))
+#     body = db.Column(db.String(512))
+#     createdAt = db.Column(db.DateTime, default=datetime.now)
+#     updatedAt = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+#     favorited = db.Column(db.Boolean)
+#     favoritesCount = db.Column(db.Integer)
+#     authorid = db.Column(db.Integer)
+#     tags = db.relationship('Tag')
+#
+#
+# class Comment(db.Model):
+#     __tablename__ = 'comments'
+#     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+#     createdAt = db.Column(db.DateTime, default=datetime.now)
+#     updatedAt = db.Column(db.DateTime, default=datetime.now, onupdate=datetime.now)
+#     body = db.Column(db.String(512))
+#     authorid = db.Column(db.Integer)
+#
+#
+# class Tag(db.Model):
+#     __tablename__ = 'tags'
+#     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+#     tag_name = db.Column(db.String(16))
+#     article_id = db.Column(db.Integer, db.ForeignKey('articles.id'))  # 外键
 
 
 # class Follow(db.Model):
@@ -219,17 +221,6 @@ class Tag(db.Model):
 #     db.session.commit()
 #     return jsonify(
 #         gen_user(username=user.username, email=user.email, bio=user.bio, image=user.image, token=user.token))
-
-
-
-
-
-
-
-
-
-
-
 
 
 # @app.route('/api/profiles/<username>', methods=['GET'])
@@ -372,9 +363,8 @@ class Tag(db.Model):
 #         ]
 #     }"""
 #     return 'tags'
-
-
+app = create_app()
 if __name__ == '__main__':
-    # db.drop_all()
+    db.drop_all()
     db.create_all()
     app.run()
