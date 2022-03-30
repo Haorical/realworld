@@ -38,3 +38,4 @@ class Tag(db.Model):
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     tag_name = db.Column(db.String(16))
     article_id = db.Column(db.Integer, db.ForeignKey('articles.id'))  # 外键
+

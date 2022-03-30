@@ -42,4 +42,4 @@ class Follow(db.Model):
     id2 = db.Column(db.Integer, primary_key=True)
     following = db.Column(db.Boolean, default=False)
 
-# db.create_all()
+db.create_all()

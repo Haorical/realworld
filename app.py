@@ -11,7 +11,7 @@ import pymysql
 from database import db
 from config import Config
 import users, articles
-
+from exc import InvalidUsage
 pymysql.install_as_MySQLdb()
 
 
@@ -24,9 +24,7 @@ def create_app(config_object=Config):
     app.config.from_object(config_object)
     register_extensions(app)
     register_blueprints(app)
-    # db.drop_all()
-    # db.creat_all()
-    # register_errorhandlers(app)
+    register_errorhandlers(app)
     # register_shellcontext(app)
     # register_commands(app)
     return app
@@ -34,7 +32,6 @@ def create_app(config_object=Config):
 
 def register_extensions(app):
     db.init_app(app)
-    # db.drop_all()
     # db.create_all()
     JWTManager().init_app(app)
     Migrate().init_app(app, db)
@@ -42,9 +39,30 @@ def register_extensions(app):
 
 def register_blueprints(app):
     app.register_blueprint(users.views.blueprint)
-    # app.register_blueprint(profiles.views.blueprint)
-    # app.register_blueprint(articles.views.blueprint)
+    app.register_blueprint(articles.views.blueprint)
 
+
+def register_errorhandlers(app):
+
+    def errorhandler(error):
+        response = error.to_json()
+        response.status_code = error.status_code
+        return response
+
+    app.errorhandler(InvalidUsage)(errorhandler)
+# def register_shellcontext(app):
+#     """Register shell context objects."""
+#     def shell_context():
+#         """Shell context objects."""
+#         return {
+#             'db': db,
+#             'User': users.models.Author,
+#             'Article': articles.models.Article,
+#             'Tag': articles.models.Tag,
+#             'Comment': articles.models.Comment,
+#         }
+#
+#     app.shell_context_processor(shell_context)
 
 # 数据库配置
 # app.secret_key = '1+1=3'
@@ -363,8 +381,7 @@ def register_blueprints(app):
 #         ]
 #     }"""
 #     return 'tags'
-app = create_app()
+
 if __name__ == '__main__':
-    db.drop_all()
-    db.create_all()
+    app = create_app()
     app.run()

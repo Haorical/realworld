@@ -11,7 +11,8 @@ blueprint = Blueprint('article', __name__)
 def get_articles():  # 获取文章 多个查询参数
     data = request.args
     if 'tag' in data:
-        articles = Article.query.filtr_by(data['tag'] in tags).all()
+        pass
+        # articles = Article.query.filtr_by(data['tag'] in tags).all()
     # params:tag author favorited limit offset
     return 'articles'
 

@@ -2,6 +2,8 @@ from flask import request, jsonify, Blueprint
 from flask_jwt_extended import create_access_token, jwt_required, get_jwt_identity
 from .models import Author, Follow
 from database import db
+from sqlalchemy.exc import IntegrityError
+from exc import InvalidUsage
 
 blueprint = Blueprint('user', __name__)
 
@@ -56,15 +58,18 @@ def sign():
         user.token = create_access_token(identity=email)
         db.session.add(user)
         db.session.commit()
-    except:
+    except IntegrityError:
         db.session.rollback()
-        return jsonify({
-            "errors": {
-                "body": [
-                    "do",
-                    "aliqua id"
-                ]
-            }}), 422, {"status": "Unprocessable Entity (WebDAV) (RFC 4918)"}
+        raise InvalidUsage.user_already_registered()
+    # except:
+    #     db.session.rollback()
+    #     return jsonify({
+    #         "errors": {
+    #             "body": [
+    #                 "do",
+    #                 "aliqua id"
+    #             ]
+    #         }}), 422, {"status": "Unprocessable Entity (WebDAV) (RFC 4918)"}
     return jsonify(
         gen_user(username=user.username, email=user.email, bio=user.bio, image=user.image, token=user.token)), 201, {
                "status": "Created"}
