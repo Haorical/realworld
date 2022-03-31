@@ -1,10 +1,5 @@
 from database import db
-from datetime import datetime
 from flask_bcrypt import Bcrypt
-from flask_sqlalchemy import SQLAlchemy
-from flask_migrate import Migrate
-from sqlalchemy.exc import IntegrityError
-# from articles.models import User2Article
 
 
 class Author(db.Model):
@@ -17,8 +12,7 @@ class Author(db.Model):
     image = db.Column(db.String(256))
     token: str = ''
 
-    # following = db.Column(db.Integer, nullable=False)
-    def __init__(self, username, email, password=None, **kwargs):
+    def __init__(self, username, email, password=None):
         self.username = username
         self.email = email
         if password:
@@ -37,16 +31,6 @@ class Author(db.Model):
         if not following:
             return False
         return following.following
-
-    # def check_fav(self, ar):
-    #     f = User2Article.query.filter_by(user_id=self.id, article_id=ar.id).first()
-    #     if not f:
-    #         return False
-    #     return f.fav
-
-    # def update(self, **kwargs):
-    #     for attr, value in kwargs.items():
-    #         setattr(self, attr, value)
 
 
 class Follow(db.Model):

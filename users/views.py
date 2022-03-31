@@ -51,10 +51,6 @@ def sign():
     email = data['user']['email']
     username = data['user']['username']
     password = data['user']['password']
-    # user = Author(username=username, password=password, email=email)
-    # user.token = create_access_token(identity=user)
-    # db.session.add(user)
-    # db.session.commit()
     try:
         user = Author(username=username, password=password, email=email)
         user.token = create_access_token(identity=email)
@@ -63,15 +59,6 @@ def sign():
     except IntegrityError:
         db.session.rollback()
         raise InvalidUsage.user_already_registered()
-    # except:
-    #     db.session.rollback()
-    #     return jsonify({
-    #         "errors": {
-    #             "body": [
-    #                 "do",
-    #                 "aliqua id"
-    #             ]
-    #         }}), 422, {"status": "Unprocessable Entity (WebDAV) (RFC 4918)"}
     return jsonify(
         gen_user(username=user.username, email=user.email, bio=user.bio, image=user.image, token=user.token)), 201, {
                "status": "Created"}

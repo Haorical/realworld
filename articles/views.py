@@ -45,11 +45,53 @@ def gen_article(a=None, b=None, c=None, d=None, e=None, f=None, g=None, h=False,
 @jwt_required()
 def get_articles():  # 获取文章 多个查询参数
     data = request.args
+    li = []
     if 'tag' in data:
-        pass
-        # articles = Article.query.filtr_by(data['tag'] in tags).all()
-    # params:tag author favorited limit offset
-    return 'articles'
+        tag = Tag.query.filter_by(tag_name=data['tag']).first()
+        if not tag:
+            raise InvalidUsage.unknown_error()
+        articleids = Article2Tag.query.filter_by(tag_id=tag.id).all()
+        for id in articleids:
+            article = Article.query.filter_by(id=id.article_id).first()
+            author = Author.query.filter_by(id=article.authorid).first()
+            li.append(gen_article(a=article.slug, b=article.title, c=article.description, d=article.body,
+                                  e=article.get_tags(),
+                                  f=article.createdAt, g=article.updatedAt, h=check_fav(author.id, article.id),
+                                  i=article.favoritesCount,
+                                  j=author.username, k=author.bio, l=author.image)['article'])
+    if 'author' in data:
+        author = Author.query.filter_by(username=data['author']).first()
+        articles = Article.query.filter_by(authorid=author.id).all()
+        for article in articles:
+            li.append(gen_article(a=article.slug, b=article.title, c=article.description, d=article.body,
+                                  e=article.get_tags(),
+                                  f=article.createdAt, g=article.updatedAt, h=check_fav(author.id, article.id),
+                                  i=article.favoritesCount,
+                                  j=author.username, k=author.bio, l=author.image)['article'])
+    if 'favorited' in data:
+        user = Author.query.filter_by(username=data['favorited']).first()
+        articleids = User2Article.query.filter_by(user_id=user.id, fav=True).all()
+        article = Article.query.filter_by(id=id.article_id).first()
+        author = Author.query.filter_by(id=article.authorid).first()
+        li.append(gen_article(a=article.slug, b=article.title, c=article.description, d=article.body,
+                              e=article.get_tags(),
+                              f=article.createdAt, g=article.updatedAt, h=check_fav(author.id, article.id),
+                              i=article.favoritesCount,
+                              j=author.username, k=author.bio, l=author.image)['article'])
+    li = list(set(li))
+    limit = 20
+    offset = 0
+    if 'limit' in data:
+        limit = int(data['limit'])
+    if 'offset' in data:
+        offset = int(data['offset'])
+    ti = []
+    cnt = 0
+    r = min(offset + limit, len(li))
+    for i in range(offset, r):
+        ti.append(li[i])
+        cnt += 1
+    return jsonify(articles=ti, articlesCount=cnt)
 
 
 @blueprint.route('/api/articles/feed', methods=['GET'])
@@ -58,12 +100,12 @@ def feed_article():
     # 返回关注用户创建文章 按更新顺序排列
     # limit offset
     data = request.args
-    limit = 9999
+    limit = 20
     offset = 0
     if 'limit' in data:
-        limit = data['limit']
+        limit = int(data['limit'])
     if 'offset' in data:
-        offset = data['offset']
+        offset = int(data['offset'])
     user_em = get_jwt_identity()
     user = Author.query.filter_by(email=user_em).first()
     authors = Follow.query.filter_by(id1=user.id).all()
@@ -79,7 +121,8 @@ def feed_article():
                                   j=author.username, k=author.bio, l=author.image)['article'])
     ti = []
     cnt = 0
-    for i in range(offset, min(offset+limit, len(li))):
+    r = min(offset + limit, len(li))
+    for i in range(offset, r):
         ti.append(li[i])
         cnt += 1
     return jsonify(articles=ti, articlesCount=cnt)
