@@ -1,11 +1,22 @@
+import datetime
+
 from flask import request, jsonify, Blueprint
 from flask_jwt_extended import jwt_required, get_jwt_identity
-from .models import Article, Comment, Tag
+from sqlalchemy import desc
+
+from .models import Article, Comment, Tag, Article2Tag, User2Article
 from users.models import Author, Follow
 from database import db
 from exc import InvalidUsage
 
 blueprint = Blueprint('article', __name__)
+
+
+def check_fav(us, ar):
+    f = User2Article.query.filter_by(user_id=us, article_id=ar).first()
+    if not f:
+        return False
+    return f.fav
 
 
 def gen_article(a=None, b=None, c=None, d=None, e=None, f=None, g=None, h=False, i=0, j=None, k=None, l=None, m=False):
@@ -46,20 +57,44 @@ def get_articles():  # 获取文章 多个查询参数
 def feed_article():
     # 返回关注用户创建文章 按更新顺序排列
     # limit offset
-    return 'articles'
+    data = request.args
+    limit = 9999
+    offset = 0
+    if 'limit' in data:
+        limit = data['limit']
+    if 'offset' in data:
+        offset = data['offset']
+    user_em = get_jwt_identity()
+    user = Author.query.filter_by(email=user_em).first()
+    authors = Follow.query.filter_by(id1=user.id).all()
+    li = []
+    for i in authors:
+        articles = Article.query.filter_by(authorid=i.id2).order_by(desc(Article.updatedAt)).all()
+        author = Author.query.filter_by(id=i.id2).first()
+        for article in articles:
+            li.append(gen_article(a=article.slug, b=article.title, c=article.description, d=article.body,
+                                  e=article.get_tags(),
+                                  f=article.createdAt, g=article.updatedAt, h=check_fav(author.id, article.id),
+                                  i=article.favoritesCount,
+                                  j=author.username, k=author.bio, l=author.image)['article'])
+    ti = []
+    cnt = 0
+    for i in range(offset, min(offset+limit, len(li))):
+        ti.append(li[i])
+        cnt += 1
+    return jsonify(articles=ti, articlesCount=cnt)
 
 
 @blueprint.route('/api/articles/<slug>', methods=['GET'])
 def get_article(slug):  # 获取文章
-    try:
-        article = Article.query.filter_by(slug=slug).first()
-        author = Author.query.filter_by(id=article.authorid).first()
-        tmp_favor = False
-        return jsonify(gen_article(a=article.slug, b=article.title, c=article.description, d=article.body, e=article.tags,
-                                   f=article.createdAt, g=article.updatedAt, h=tmp_favor, i=article.favoritesCount,
-                                   j=author.username, k=author.bio, l=author.image))
-    except:
+    article = Article.query.filter_by(slug=slug).first()
+    if not article:
         raise InvalidUsage.article_not_found()
+    author = Author.query.filter_by(id=article.authorid).first()
+    return jsonify(
+        gen_article(a=article.slug, b=article.title, c=article.description, d=article.body, e=article.get_tags(),
+                    f=article.createdAt, g=article.updatedAt, h=False, i=article.favoritesCount,
+                    j=author.username, k=author.bio, l=author.image))
 
 
 @blueprint.route('/api/articles/<slug>', methods=['PUT', 'DELETE'])  # 更新文章
@@ -67,6 +102,8 @@ def get_article(slug):  # 获取文章
 def update_article(slug):
     if request.method == 'PUT':
         article = Article.query.filter_by(slug=slug).first()
+        if not article:
+            raise InvalidUsage.article_not_found()
         data = request.get_json()['article']
         if 'title' in data:
             article.title = data['title']
@@ -75,36 +112,48 @@ def update_article(slug):
             article.description = data['description']
         if 'body' in data:
             article.body = data['body']
+        article.updatedAt = datetime.datetime.utcnow()
         db.session.commit()
         author = Author.query.filter_by(id=article.authorid).first()
-        tmp_favor = False
         return jsonify(
-            gen_article(a=article.slug, b=article.title, c=article.description, d=article.body, e=article.tags,
-                        f=article.createdAt, g=article.updatedAt, h=tmp_favor, i=article.favoritesCount,
+            gen_article(a=article.slug, b=article.title, c=article.description, d=article.body, e=article.get_tags(),
+                        f=article.createdAt, g=article.updatedAt, h=check_fav(author.id, article.id),
+                        i=article.favoritesCount,
                         j=author.username, k=author.bio, l=author.image))
     elif request.method == 'DELETE':  # 删除文章
-        try:
-            article = Article.query.filter_by(slug=slug).first()
-            db.session.delete(article)
-            db.session.commit()
-        except:
+        article = Article.query.filter_by(slug=slug).first()
+        if not article:
             raise InvalidUsage.article_not_found()
+        db.session.delete(article)
+        db.session.commit()
+        return jsonify(None)
 
 
 @blueprint.route('/api/articles', methods=['POST'])
 @jwt_required()
 def creat_article():  # 创建文章
-    """{
-        "article": {
-            "title": "How to train your dragon",
-            "description": "Ever wonder how?",
-            "body": "You have to believe",
-            "tagList": ["reactjs", "angularjs", "dragons"]  可选参数
-        }
-    }"""
+    author_em = get_jwt_identity()
+    author = Author.query.filter_by(email=author_em).first()
     data = request.get_json()['article']
-    article = Article(slug=data['title'],)
-    return 'article'
+    article = Article(slug=data['title'], title=data['title'], description=data['description'], body=data['body'],
+                      authorid=author.id)
+    db.session.add(article)
+    db.session.commit()
+    if 'tagList' in data:
+        for i in data['tagList']:
+            tag = Tag.query.filter_by(tag_name=i).first()
+            if not tag:
+                tag = Tag(tag_name=i)
+                db.session.add(tag)
+                db.session.commit()
+            a2t = Article2Tag(article_id=article.id, tag_id=tag.id)
+            db.session.add(a2t)
+            db.session.commit()
+    print(article.get_tags())
+    return jsonify(
+        gen_article(a=article.slug, b=article.title, c=article.description, d=article.body, e=article.get_tags(),
+                    f=article.createdAt, g=article.updatedAt, h=False, i=article.favoritesCount,
+                    j=author.username, k=author.bio, l=author.image))
 
 
 def gen_comments(a=None, b=None, c=None, d=None, e=None, f=None, g=None, h=False):
@@ -141,13 +190,15 @@ def op_comments(slug):
     elif request.method == 'GET':  # 获取评论
         user_email = get_jwt_identity()
         current_user = Author.query.filter_by(email=user_email).first()
-        comments = Comment.query.filter_by(slug=slug).all()
+        article = Article.query.filter_by(slug=slug).first()
+        if not article:
+            raise InvalidUsage.article_not_found()
+        comments = Comment.query.filter_by(articleid=article.id).all()
         tcm = []
         for cmt in comments:
             author = Author.query.filter_by(id=cmt.authorid).first()
-            is_follow = Follow.query.filter_by(id1=current_user.id, id2=author.id).first().following
             tcm.append(gen_comments(a=cmt.id, b=cmt.createdAt, c=cmt.updatedAt, d=cmt.body, e=author.username,
-                                    f=author.bio, g=author.image, h=is_follow))
+                                    f=author.bio, g=author.image, h=current_user.check_follow(author.id)))
         return jsonify(comments=tcm)
 
 
@@ -155,9 +206,12 @@ def op_comments(slug):
 @blueprint.route('/api/articles/<slug>/comments/<cid>', methods=['DELETE'])
 @jwt_required()
 def delete_comments(slug, cid):
-    cm = Comment.query.filter_by(id=cid)
+    cm = Comment.query.filter_by(id=cid).first()
+    if not cm:
+        raise InvalidUsage.comment_not_owned()
     db.session.delete(cm)
     db.session.commit()
+    return jsonify(None)
 
 
 # （不）喜欢文章
@@ -165,18 +219,46 @@ def delete_comments(slug, cid):
 @jwt_required()
 def favorite_articles(slug):
     if request.method == 'POST':
-        return 'favorite article'
+        current_user_email = get_jwt_identity()
+        current_user = Author.query.filter_by(email=current_user_email).first()
+        article = Article.query.filter_by(slug=slug).first()
+        if not article:
+            raise InvalidUsage.article_not_found()
+        article.favoritesCount += 1
+        author = Author.query.filter_by(id=article.authorid).first()
+        try:
+            f = User2Article.query.filter_by(user_id=current_user.id, article_id=article.id).first()
+            f.fav = True
+        except:
+            f = User2Article(user_id=current_user.id, article_id=article.id)
+            db.session.add(f)
+        db.session.commit()
+        return jsonify(
+            gen_article(a=article.slug, b=article.title, c=article.description, d=article.body, e=article.get_tags(),
+                        f=article.createdAt, g=article.updatedAt, h=True, i=article.favoritesCount,
+                        j=author.username, k=author.bio, l=author.image, m=current_user.check_follow(author.id)))
     elif request.method == 'DELETE':
-        return 'unfavorite article'
+        current_user_email = get_jwt_identity()
+        current_user = Author.query.filter_by(email=current_user_email).first()
+        article = Article.query.filter_by(slug=slug).first()
+        if not article:
+            raise InvalidUsage.article_not_found()
+        article.favoritesCount -= 1
+        author = Author.query.filter_by(id=article.authorid).first()
+        f = User2Article.query.filter_by(user_id=current_user.id, article_id=article.id).first()
+        f.fav = False
+        db.session.commit()
+        return jsonify(
+            gen_article(a=article.slug, b=article.title, c=article.description, d=article.body, e=article.get_tags(),
+                        f=article.createdAt, g=article.updatedAt, h=False, i=article.favoritesCount,
+                        j=author.username, k=author.bio, l=author.image, m=current_user.check_follow(author.id)))
 
 
 # 获取标签
 @blueprint.route('/api/tags', methods=['GET'])
 def get_tags():
-    """{
-        "tags": [
-            "reactjs",
-            "angularjs"
-        ]
-    }"""
-    return 'tags'
+    tags = Tag.query.filter_by().all()
+    li = []
+    for i in tags:
+        li.append(i.tag_name)
+    return jsonify(tags=li)

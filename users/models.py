@@ -4,6 +4,7 @@ from flask_bcrypt import Bcrypt
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from sqlalchemy.exc import IntegrityError
+# from articles.models import User2Article
 
 
 class Author(db.Model):
@@ -30,6 +31,18 @@ class Author(db.Model):
 
     def check_password(self, value):
         return Bcrypt().check_password_hash(self.password, value)
+
+    def check_follow(self, au):
+        following = Follow.query.filter_by(id1=self.id, id2=au).first()
+        if not following:
+            return False
+        return following.following
+
+    # def check_fav(self, ar):
+    #     f = User2Article.query.filter_by(user_id=self.id, article_id=ar.id).first()
+    #     if not f:
+    #         return False
+    #     return f.fav
 
     # def update(self, **kwargs):
     #     for attr, value in kwargs.items():
